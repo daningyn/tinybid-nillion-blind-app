@@ -4,6 +4,7 @@ import { Press_Start_2P } from "next/font/google";
 import { ScaffoldEthAppWithProviders } from "@/components/ScaffoldEthAppWithProviders";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "@/styles/globals.css";
+import { NextUIProvider } from "@nextui-org/system";
 
 const font = Press_Start_2P({ weight: ["400"], subsets: ["latin"] });
 
@@ -49,9 +50,11 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   return (
     <html suppressHydrationWarning>
       <body className={`${font.className} antialiased`}>
-        <ThemeProvider enableSystem>
-          <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
-        </ThemeProvider>
+        <NextUIProvider>
+          <ThemeProvider enableSystem>
+            <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
+          </ThemeProvider>
+        </NextUIProvider>
       </body>
     </html>
   );
