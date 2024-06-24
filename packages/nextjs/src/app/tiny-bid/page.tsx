@@ -206,7 +206,7 @@ const Home: NextPage = () => {
     <>
       <div className="flex flex-col items-center max-w-[1280px] py-[60px] px-[10px] w-full gap-y-8">
         <div className="Header flex flex-col gap-y-4">
-          <h1 className="text-[19px] font-bold">Blind app tinybid: Secure Single-Item First-Price Auction Demo</h1>
+          <h1 className="text-[19px] font-bold">Vickrey Auction: Secure Single-Item First-Price Auction Demo</h1>
           <div className="description text-[13px] font-normal">
             This new program demonstrates a secure single-item first-price auction using the Nillion Nada program.
             <div className="line w-full h-[1px] bg-white mt-2"></div>
@@ -264,7 +264,7 @@ const Home: NextPage = () => {
                           value={programId ? programId : ""}
                           onChange={e => setProgramId(e.target.value)}
                           placeholder="Program Id"
-                          className="p-3 mt-4"
+                          className="p-3 mt-4 text-black"
                         />
                       </div>
                     </div>
@@ -281,7 +281,7 @@ const Home: NextPage = () => {
                       value={userIdAdmin ? userIdAdmin : ""}
                       onChange={e => setUserIdAdmin(e.target.value)}
                       placeholder="User Id"
-                      className="p-3 mt-4"
+                      className="p-3 mt-4 text-black"
                     />
                   </div>
                 </div>
@@ -289,8 +289,9 @@ const Home: NextPage = () => {
 
               {programId && (
                 <div>
-                  <div className="flex justify-center items-center space-x-2 mt-20">
-                    <img src="/image.png" alt="Mona Lisa" />
+                  <div className="flex flex-col justify-center items-center space-x-2 mt-10 gap-y-6">
+                    <label className="text-lg">Vickrey Auction for Mona Lisa</label>
+                    <img className="rounded-md" src="/image.png" alt="Mona Lisa" />
                   </div>
 
                   <div className="flex justify-center items-center space-x-2 mt-20">
@@ -299,7 +300,7 @@ const Home: NextPage = () => {
                       value={bidderIndex}
                       onChange={e => handleBidderIndex(e.target.value)}
                       type={"number"}
-                      className="p-1 w-20"
+                      className="p-1 w-20 text-black"
                     />
                   </div>
 
@@ -308,19 +309,19 @@ const Home: NextPage = () => {
                       <input
                         value={storeId1}
                         onChange={e => setStoreId1(e.target.value)}
-                        className="p-1"
+                        className="p-1 text-black"
                         placeholder="Store id index 1"
                       />
                       <input
                         value={storeId2}
                         onChange={e => setStoreId2(e.target.value)}
-                        className="p-1"
+                        className="p-1 text-black"
                         placeholder="Store id index 2"
                       />
                       <input
                         value={storeId3}
                         onChange={e => setStoreId3(e.target.value)}
-                        className="p-1"
+                        className="p-1 text-black"
                         placeholder="Store id index 3"
                       />
                     </div>
@@ -337,14 +338,14 @@ const Home: NextPage = () => {
                         className="h-[180px] "
                         size="lg"
                         step={1}
-                        maxValue={15}
-                        minValue={0}
+                        maxValue={100}
+                        minValue={1}
                         orientation="vertical"
                         aria-label="Temperature"
-                        defaultValue={0}
+                        defaultValue={1}
                         showSteps={false}
                         showTooltip={true}
-                        onChange={handleSliderChange}
+                        onChange={value => {handleSliderChange(value as number)}}
                         tooltipProps={{
                           offset: 10,
                           placement: "right",
