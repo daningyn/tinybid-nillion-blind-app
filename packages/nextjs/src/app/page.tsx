@@ -1,15 +1,22 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import CodeSnippet from "@/components/nillion/CodeSnippet";
+import { CopyString } from "@/components/nillion/CopyString";
+import { NillionOnboarding } from "@/components/nillion/NillionOnboarding";
+import RetrieveSecretCommand from "@/components/nillion/RetrieveSecretCommand";
+import SecretForm from "@/components/nillion/SecretForm";
 import { Address } from "@/components/scaffold-eth";
-import { Slider } from "@nextui-org/slider";
-import { useEffect, useState } from "react";
-import { getUserKeyFromSnap } from "@/utils/nillion";
+import { compute } from "@/utils/nillion/compute";
+import { getUserKeyFromSnap } from "@/utils/nillion/getUserKeyFromSnap";
+import { retrieveSecretCommand } from "@/utils/nillion/retrieveSecretCommand";
+import { retrieveSecretInteger } from "@/utils/nillion/retrieveSecretInteger";
 import { storeProgram } from "@/utils/nillion/storeProgram";
-import { UserKey } from "@nillion/nillion-client-js-browser";
+import { storeSecretsInteger } from "@/utils/nillion/storeSecretsInteger";
+import { Slider } from "@nextui-org/slider";
+import { set } from "nprogress";
 
 interface StringObject {
   [key: string]: string | null;
@@ -17,85 +24,370 @@ interface StringObject {
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
+  const [connectedToSnap, setConnectedToSnap] = useState<boolean>(false);
+  const [userKey, setUserKey] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userIdAdmin, setUserIdAdmin] = useState<string | null>(null);
+  const [nillion, setNillion] = useState<any>(null);
+  const [nillionClient, setNillionClient] = useState<any>(null);
+
+  const [programName] = useState<string>("nft_bid");
+  const [programId, setProgramId] = useState<string | null>(null);
+  const [programIdInput, setProgramIdInput] = useState<string>("");
+  const [computeResult, setComputeResult] = useState<string | null>(null);
+  const [isDisabledButton, setIsDisabledButton] = useState<boolean>(false);
+  const [bidderIndex, setBidderIndex] = useState<string>("");
+  const [partyName, setPatyName] = useState<string>("");
+  const [secretName, setSecretName] = useState<string>("");
+  const [secretValue, setSecretValue] = useState<string>("0");
+  const [valueBidder, setValueBidder] = useState<string>("0");
+  const [storeId1, setStoreId1] = useState<string>("");
+  const [storeId2, setStoreId2] = useState<string>("");
+  const [storeId3, setStoreId3] = useState<string>("");
+  const [partyIdsStoreIds, setPartyIdsStoreIds] = useState<string>("");
+  const [winner, setWinner] = useState<string | null>(null);
+
+  const [storedSecretsNameToStoreId, setStoredSecretsNameToStoreId] = useState<StringObject>({
+    my_int1: null,
+    my_int2: null,
+  });
+  const [parties] = useState<string[]>(["Bidder0"]);
+  const [outputs] = useState<string[]>(["isWin"]);
+
+  // connect to snap
+  async function handleConnectToSnap() {
+    const snapResponse = await getUserKeyFromSnap();
+    setUserKey(snapResponse?.user_key || null);
+    setConnectedToSnap(snapResponse?.connectedToSnap || false);
+  }
+
+  // store program in the Nillion network and set the resulting program id
+  async function handleStoreProgram() {
+    console.log("programName", programName);
+    await storeProgram(nillionClient, programName).then(setProgramId);
+    setIsDisabledButton(true);
+  }
+
+  async function handleRetrieveInt(secret_name: string, store_id: string | null) {
+    if (store_id) {
+      const value = await retrieveSecretInteger(nillionClient, store_id, secret_name);
+      alert(`${secret_name} is ${value}`);
+    }
+  }
+
+  // reset nillion values
+  const resetNillion = () => {
+    setConnectedToSnap(false);
+    setUserKey(null);
+    setUserId(null);
+    setNillion(null);
+    setNillionClient(null);
+  };
+
+  useEffect(() => {
+    // when wallet is disconnected, reset nillion
+    if (!connectedAddress) {
+      resetNillion();
+    }
+  }, [connectedAddress]);
+
+  // Initialize nillionClient for use on page
+  useEffect(() => {
+    if (userKey) {
+      const getNillionClientLibrary = async () => {
+        const nillionClientUtil = await import("@/utils/nillion/nillionClient");
+        const libraries = await nillionClientUtil.getNillionClient(userKey);
+        setNillion(libraries.nillion);
+        setNillionClient(libraries.nillionClient);
+        return libraries.nillionClient;
+      };
+      getNillionClientLibrary().then(nillionClient => {
+        const user_id = nillionClient.user_id;
+        setUserId(user_id);
+      });
+    }
+  }, [userKey]);
+
+
+  // handle bidder index
+  function handleBidderIndex(value: string) {
+    setBidderIndex(value);
+    setPatyName("Bidder" + value);
+    setSecretName("bid_input" + value);
+  }
+
+  function handleSliderChange(value: number) {
+    console.log("Slider value: ", value);
+    setValueBidder(value.toString());``
+    setSecretValue(value.toString());
+  }
+
+
+  async function handleBidder() {
+    if (programId) {
+      console.log("programId", programId);
+      console.log("secretName", secretName);
+      console.log("partyName", partyName);
+      console.log("secretValue", secretValue);
+
+      const secrets = new nillion.Secrets();
+
+      // create new SecretInteger with value cast to string
+      const newSecret = nillion.Secret.new_integer(secretValue);
+      // insert the SecretInteger into secrets object
+      secrets.insert(secretName, newSecret);
+
+      // create program bindings for secret so it can be used in a specific program
+      const secret_program_bindings = new nillion.ProgramBindings(programId);
+
+      // set the input party to the bindings to specify which party will provide the secret
+      const party_id = nillionClient.party_id;
+      secret_program_bindings.add_input_party(partyName, party_id);
+
+      // get user id for user storing the secret
+      const user_id = nillionClient.user_id;
+      console.log("user_id", user_id);
+
+      // create a permissions object, give the storer default permissions, including compute permissions with the program id
+      const permissions = nillion.Permissions.default_for_user(user_id, programId);
+
+      if (userIdAdmin) {
+        console.log("userIdAdmin", userIdAdmin);
+        const computePermissions: { [key: string]: string[] } = {};
+        computePermissions[userIdAdmin] = [programId];
+        console.log("computePermissions", computePermissions);
+        permissions.add_compute_permissions(computePermissions);
+      }
+
+      // store secret(s) with bindings and permissions
+      const store_id = await nillionClient.store_secrets(
+        process.env.NEXT_PUBLIC_NILLION_CLUSTER_ID,
+        secrets,
+        secret_program_bindings,
+        permissions,
+      );
+      console.log("party_id", party_id);
+      console.log("store_id", store_id);
+      console.log("party_ids_to_store_ids", party_id+':'+store_id);
+      setPartyIdsStoreIds(party_id+':'+store_id);
+
+      if (partyName == 'Bidder0') {
+        const storeIds = [store_id, storeId1, storeId2, storeId3];
+        const result = await compute(nillion, nillionClient, storeIds, programId, outputs[0]);
+        console.log("result", result);
+        const winner = findWinPosition(result);
+        console.log("winner", winner);
+        setWinner(winner);
+      }
+    }
+  }
+
+  function findWinPosition(winObj: any) {
+    for (const key in winObj) {
+      if (winObj.hasOwnProperty(key)) {
+        if (winObj[key] === 1n) {
+          if (key == 'isWin0') {
+            return 'Bidder0';
+          } else if (key == 'isWin1') {
+            return 'Bidder1';
+          } else if (key == 'isWin2') {
+            return 'Bidder2';
+          } else if (key == 'isWin3') {
+            return 'Bidder3';
+          }
+        }
+      }
+    }
+    return null;
+  }
+
 
   return (
-    <div className="flex flex-col items-center max-w-[1280px] py-[60px] px-[10px] w-full gap-y-8">
-      <div className="Header flex flex-col gap-y-4">
-        <h1 className="text-[19px] font-bold">Blind app tinybid: Secure Single-Item First-Price Auction Demo</h1>
-        <div className="description text-[13px] font-normal">
-          This new program demonstrates a secure single-item first-price auction using the Nillion Nada program.
-          <div className="line w-full h-[1px] bg-white mt-2"></div>
-          <br />
-          For each bid submitted by a bidder, it is transformed into a secret number within the Nada program. 
-          Once the time expires or the required number of bids is reached (in this case, if all bidders have submitted their bids, the program will calculate), 
-          the program calculates and reveals the bidders with the highest bids.
-        </div>
-      </div>
-      <div className="Section1 flex flex-row gap-x-4 w-full max-md:flex-col max-md:gap-y-4">
-        <div className="Description flex flex-row gap-x-2 w-[25%] py-2 items-start max-md:w-full">
-          <div className="title text-xl mb-auto">1.</div>
-          <div className="desc text-[12px] font-normal">
-            For each bidder, use the slider to choose a bid value and then click Bid. The bids are encoded.
+    <>
+      <div className="flex flex-col items-center max-w-[1280px] py-[60px] px-[10px] w-full gap-y-8">
+        <div className="Header flex flex-col gap-y-4">
+          <h1 className="text-[19px] font-bold">Vickrey Auction: Secure Single-Item First-Price Auction Demo</h1>
+          <div className="description text-[13px] font-normal">
+            This new program demonstrates a secure single-item first-price auction using the Nillion Nada program.
+            <div className="line w-full h-[1px] bg-white mt-2"></div>
+            <br />
+            For each bid submitted by a bidder, it is transformed into a secret number within the Nada program.
+            Once the time expires or the required number of bids is reached (in this case, if all bidders have submitted their bids, the program will calculate),
+            the program calculates and reveals the bidders with the highest bids.
           </div>
         </div>
-        <div className="SliderContainer flex flex-row gap-x-6 w-[75%] max-md:gap-x-4 max-md:w-full">
-          {
-            [...Array(4)].map((_, i) => {
-              return (
-                <div key={`Slider-${i}`}
-                  className="Slider flex flex-col gap-y-2 flex-grow border-[1px] rounded-md items-center p-4"
-                >
-                  <div className="Title text-sm font-medium w-full text-left max-lg:text-xs">
-                    Bidder {i + 1}
+        <div className="px-5 flex flex-col">
+          <h1 className="text-xl">
+            {connectedAddress && connectedToSnap && !userKey && (
+              <a target="_blank" href="https://nillion-snap-site.vercel.app/" rel="noopener noreferrer">
+                <button className="btn btn-sm btn-primary mt-4">
+                  No Nillion User Key - Generate and store user key here
+                </button>
+              </a>
+            )}
+          </h1>
+
+          {connectedAddress && !connectedToSnap && (
+            <button className="btn p-3 btn-sm btn-primary mt-4 bg-blue-600" onClick={handleConnectToSnap}>
+              Connect to Snap
+            </button>
+          )}
+
+          {connectedToSnap && (
+            <div>
+              {userKey && (
+                <div>
+                  <div className="flex justify-center items-center space-x-2">
+                    <p className="my-2 font-medium">
+                      User Key:
+                    </p>
+                    <CopyString str={userKey} />
                   </div>
-                  <div className="Slider max-lg:text-xs">
-                    <Slider
-                      className="h-[180px] "
-                      size="lg"
-                      step={1} 
-                      maxValue={15} 
-                      minValue={0} 
-                      orientation="vertical"
-                      aria-label="Temperature"
-                      defaultValue={0}
-                      showSteps={false}
-                      showTooltip={true}
-                      tooltipProps={{
-                        offset: 10,
-                        placement: "right",
-                        classNames: {
-                          base: [
-                            "before:bg-gradient-to-r before:from-secondary-400 before:to-primary-500",
-                          ],
-                          content: [
-                            "py-2 shadow-xl",
-                            "text-white bg-gradient-to-r from-secondary-400 to-primary-500",
-                          ],
-                        },
-                      }}
+
+                  {userId && (
+                    <div className="flex justify-center items-center space-x-2">
+                      <p className="my-2 font-medium">User ID:</p>
+                      <CopyString str={userId} />
+                    </div>
+                  )}
+                  <div className="flex justify-center items-center space-x-2">
+                    <button className="btn p-3 btn-sm btn-primary mt-4 bg-blue-600" onClick={handleStoreProgram} disabled={isDisabledButton}>
+                      Start Game
+                    </button>
+                  </div>
+
+                  {!isDisabledButton ? (
+                    <div>
+                      <div className="flex justify-center items-center space-x-2">
+                        <input
+                          id="programId"
+                          value={programId ? programId : ""}
+                          onChange={e => setProgramId(e.target.value)}
+                          placeholder="Program Id"
+                          className="p-3 mt-4 text-black"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-center items-center space-x-2">
+                      <p className="my-2 font-medium">Program ID:</p>
+                      <CopyString str={programId ?? ""} />
+                    </div>
+                  )}
+
+                  <div className="flex justify-center items-center space-x-2">
+                    <input
+                      id="userId"
+                      value={userIdAdmin ? userIdAdmin : ""}
+                      onChange={e => setUserIdAdmin(e.target.value)}
+                      placeholder="User Id"
+                      className="p-3 mt-4 text-black"
                     />
                   </div>
-                  <button className="BidButton rounded-md text-[12px] py-2 px-4 border-[1px] hover:bg-blue-400 max-lg:text-xs">
-                    Bid
-                  </button>
                 </div>
-              )
-            })
-          }
+              )}
+
+              {programId && (
+                <div>
+                  <div className="flex flex-col justify-center items-center space-x-2 mt-10 gap-y-6">
+                    <label className="text-lg">Vickrey Auction for Mona Lisa</label>
+                    <img className="rounded-md" src="/image.png" alt="Mona Lisa" />
+                  </div>
+
+                  <div className="flex justify-center items-center space-x-2 mt-20">
+                    <label>Bidder Index</label>
+                    <input
+                      value={bidderIndex}
+                      onChange={e => handleBidderIndex(e.target.value)}
+                      type={"number"}
+                      className="p-1 w-20 text-black"
+                    />
+                  </div>
+
+                  {bidderIndex == "0" && (
+                    <div className="flex justify-center items-center space-x-2 mt-20">
+                      <input
+                        value={storeId1}
+                        onChange={e => setStoreId1(e.target.value)}
+                        className="p-1 text-black"
+                        placeholder="Store id index 1"
+                      />
+                      <input
+                        value={storeId2}
+                        onChange={e => setStoreId2(e.target.value)}
+                        className="p-1 text-black"
+                        placeholder="Store id index 2"
+                      />
+                      <input
+                        value={storeId3}
+                        onChange={e => setStoreId3(e.target.value)}
+                        className="p-1 text-black"
+                        placeholder="Store id index 3"
+                      />
+                    </div>
+                  )}
+
+                  <div key={`Slider`}
+                    className="Slider flex flex-col gap-y-2 flex-grow border-[1px] rounded-md items-center p-4 mt-10"
+                  >
+                    <div className="Title text-sm font-medium w-full text-left max-lg:text-xs">
+                      Bidder{bidderIndex}
+                    </div>
+                    <div className="Slider max-lg:text-xs">
+                      <Slider
+                        className="h-[180px] "
+                        size="lg"
+                        step={1}
+                        maxValue={100}
+                        minValue={1}
+                        orientation="vertical"
+                        aria-label="Temperature"
+                        defaultValue={1}
+                        showSteps={false}
+                        showTooltip={true}
+                        onChange={value => {handleSliderChange(value as number)}}
+                        tooltipProps={{
+                          offset: 10,
+                          placement: "right",
+                          classNames: {
+                            base: [
+                              "before:bg-gradient-to-r before:from-secondary-400 before:to-primary-500",
+                            ],
+                            content: [
+                              "py-2 shadow-xl",
+                              "text-white bg-gradient-to-r from-secondary-400 to-primary-500",
+                            ],
+                          },
+                        }}
+                      />
+                    </div>
+                    <button className="BidButton rounded-md text-[12px] py-2 px-4 border-[1px] hover:bg-blue-400 max-lg:text-xs"
+                      onClick={handleBidder}
+                    >
+                      Bid
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
         </div>
-      </div>
-      <div className="Section2 flex flex-row gap-x-4 w-full max-md:flex-col max-md:gap-y-4">
-        <div className="Description flex flex-row gap-x-2 w-[25%] py-2 items-start flex-shrink max-md:w-full">
-          <div className="title text-xl mb-auto">2.</div>
-          <div className="desc text-[12px] font-normal">
-            The auction operator receives the result to determine the winner and their bid.
+
+        {partyIdsStoreIds && partyName != "Bidder0" && (
+          <div className="flex flex-col gap-y-2 flex-grow border-[1px] rounded-md items-center p-4 mt-20 w-full">
+            <h1 className="text-xl">Party id and store id</h1>
+            <CopyString str={partyIdsStoreIds} />
           </div>
-        </div>
-        <div className="Result flex flex-row gap-x-6 w-[75%] flex-grow max-md:gap-x-4 max-md:w-full">
-          <textarea className="w-full flex flex-col gap-y-2 flex-grow border-[1px] rounded-md items-center p-4"></textarea>
-        </div>
+        )}
+
+        {winner && (
+          <div className="flex flex-col gap-y-2 flex-grow border-[1px] rounded-md items-center p-4 mt-20 w-full">
+            <h1 className="text-xl">Winner: {winner}</h1>
+          </div>
+        )}
       </div>
-    </div>
+    </>
   );
 };
 
