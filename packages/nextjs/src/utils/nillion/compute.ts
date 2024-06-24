@@ -15,8 +15,6 @@ export async function compute(
   publicVariables: JsInput[] = [],
 ): Promise<string> {
   try {
-    
-    
     // const storeIdSplit1 = store_ids[1].split(":");
     // const storeIdSplit2 = store_ids[2].split(":");
     // const storeIdSplit3 = store_ids[3].split(":");
@@ -33,12 +31,16 @@ export async function compute(
     const splitId2 = store_ids[2].split(':');
     const splitId3 = store_ids[3].split(':');
 
-    const storeIds: { [key: string]: string } = {};
-    storeIds[party_id] = store_ids[0];
-    storeIds[splitId1[0]] = splitId1[1];
-    storeIds[splitId2[0]] = splitId2[1];
-    storeIds[splitId3[0]] = splitId3[1];
+    const storeIds = [];
+    storeIds.push(store_ids[0]);
+    storeIds.push(splitId1[1]);
+    storeIds.push(splitId2[1]);
+    storeIds.push(splitId3[1]);
 
+    console.log("Bidder0", party_id);
+    console.log("Bidder1", splitId1[0]);
+    console.log("Bidder2", splitId2[0]);
+    console.log("Bidder3", splitId3[0]);
     // add input party details (name and party id) to program bindings
     program_bindings.add_input_party('Bidder0', party_id);
     program_bindings.add_input_party('Bidder1', splitId1[0]);
@@ -80,10 +82,9 @@ export async function compute(
       public_variables,
     );
 
-    const compute_result = await nillionClient.compute_result(compute_result_uuid);
-    console.log("compute_result", compute_result);
-    const result = compute_result[outputName].toString();
-    return result;
+    console.log("compute_result_uuid", compute_result_uuid);
+
+    return await nillionClient.compute_result(compute_result_uuid);
   } catch (error: any) {
     console.log("error", error);
     return "error";

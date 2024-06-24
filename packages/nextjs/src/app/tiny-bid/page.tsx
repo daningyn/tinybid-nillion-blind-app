@@ -44,6 +44,8 @@ const Home: NextPage = () => {
   const [storeId1, setStoreId1] = useState<string>("");
   const [storeId2, setStoreId2] = useState<string>("");
   const [storeId3, setStoreId3] = useState<string>("");
+  const [partyIdsStoreIds, setPartyIdsStoreIds] = useState<string>("");
+  const [winner, setWinner] = useState<string | null>(null);
 
   const [storedSecretsNameToStoreId, setStoredSecretsNameToStoreId] = useState<StringObject>({
     my_int1: null,
@@ -167,13 +169,36 @@ const Home: NextPage = () => {
       console.log("party_id", party_id);
       console.log("store_id", store_id);
       console.log("party_ids_to_store_ids", party_id+':'+store_id);
+      setPartyIdsStoreIds(party_id+':'+store_id);
 
       if (partyName == 'Bidder0') {
         const storeIds = [store_id, storeId1, storeId2, storeId3];
         const result = await compute(nillion, nillionClient, storeIds, programId, outputs[0]);
         console.log("result", result);
+        const winner = findWinPosition(result);
+        console.log("winner", winner);
+        setWinner(winner);
       }
     }
+  }
+
+  function findWinPosition(winObj: any) {
+    for (const key in winObj) {
+      if (winObj.hasOwnProperty(key)) {
+        if (winObj[key] === 1n) {
+          if (key == 'isWin0') {
+            return 'Bidder0';
+          } else if (key == 'isWin1') {
+            return 'Bidder1';
+          } else if (key == 'isWin2') {
+            return 'Bidder2';
+          } else if (key == 'isWin3') {
+            return 'Bidder3';
+          }
+        }
+      }
+    }
+    return null;
   }
 
 
@@ -348,12 +373,18 @@ const Home: NextPage = () => {
           )}
         </div>
 
-        <div className="flex-grow bg-base-300 w-full mt-16 px-8 py-12">
-          <div className="flex justify-center items-center gap-12 flex-col sm:flex-row">
-              <div>
-              </div>
+        {partyIdsStoreIds && partyName != "Bidder0" && (
+          <div className="flex flex-col gap-y-2 flex-grow border-[1px] rounded-md items-center p-4 mt-20 w-full">
+            <h1 className="text-xl">Party id and store id</h1>
+            <CopyString str={partyIdsStoreIds} />
           </div>
-        </div>
+        )}
+
+        {winner && (
+          <div className="flex flex-col gap-y-2 flex-grow border-[1px] rounded-md items-center p-4 mt-20 w-full">
+            <h1 className="text-xl">Winner: {winner}</h1>
+          </div>
+        )}
       </div>
     </>
   );
