@@ -6,6 +6,14 @@ import { useAccount } from "wagmi";
 import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Address } from "@/components/scaffold-eth";
 import { Slider } from "@nextui-org/slider";
+import { useEffect, useState } from "react";
+import { getUserKeyFromSnap } from "@/utils/nillion";
+import { storeProgram } from "@/utils/nillion/storeProgram";
+import { UserKey } from "@nillion/nillion-client-js-browser";
+
+interface StringObject {
+  [key: string]: string | null;
+}
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
